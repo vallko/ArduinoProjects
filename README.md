@@ -7,3 +7,4 @@ Rotating servo for car Dash with NANO
 - Arduino Nano
 - DC-DC 12V to 5V + diode 4.2волта за захранване на таблет и 5 волта за Arduino
 - 1 relay модул за превклюване към ниско ниво за информация за включване на таблет
+- Използвана е среда Arduino 1.8.4 и библиотека Stepper.h
