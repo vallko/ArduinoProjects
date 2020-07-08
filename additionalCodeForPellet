@@ -1,0 +1,125 @@
+void setup() {
+  // put your setup code here, to run once:
+  int val1;      						                //stoinost buton			
+  int counterSubMenu = 0;				                //broqch  podMenu			default:0
+  int counterMainMenu = 0;                              //broqch GlavnoMenu			default:0
+  int counterMenuCheck = 0;                             // broqch za proverka dali e v pod menu; 0 - Glavno; 
+  int fireIsPresent = 0;				                //stoinost 0 - nqma ogun ; stoinost 1 - ima ogun;
+  int mainSupplyPelletRelay1 = 0; 				        // Rele podavasht shenk kum gorelka; 0 - izkl; 1 - vkl;
+  int burnerSupplyPelletRelay2 = 0;			            // Zarejdasht shnek na peleti v gorelkata; 0 - izkl; 1 - vkl;
+  int watePumpRelay3 = 0;                               // Rele za vkluchvane na vodnata pompa;
+  int ceramicHeater = 0; 				               // Nagrevatel za zapalvane; 0 - izkl; 1 - vkl;
+  int waterTemperature = 0;                          // stoinost temperatura Voda; 						default: 25
+  int turbineSpeed = 0;				                // stoinost skorostTurbina;
+  int keepUpMode = 0;				                   // Rejim na poddurjane na zadadenite stoinosti; 	default 0;
+  int backFireHighTemp = 0;                          // Rejim zashtita obraten ogun; 0 - nqma; 1 - visokaTemperatura spira podavane kum gorelka;
+  int pelletSensorFull = 0;                         //Sensor za prepulvane; 0 - vkluchva glaven shnek i pulni gorelka; 1 - izkluchva podavane ot glaven shnek;
+  int bunkerPelletQuantity = 0;                     //senzor za izchislqvane na kolichestvo na peleti; stoinost v % ot 0 - 100;
+}
+
+void buttonCheck(){
+//....................................button  UP
+  if((val1 >= 50)&&(val1<=195)){      
+  int k = 0;
+  int i = 0;
+    for (k; k<=100; k++){
+      if(k>=70){
+        i = 1;
+      }else{
+        i = 0;              
+      }
+    }
+    if (i == 1){
+switch (counterMenuCheck){
+case (0):
+counterMainMenu++;
+break;
+case (1):
+counterSubMenu++;
+break;
+case (2);
+break;
+default:
+break;
+}
+    }
+  }
+//.................................... button DOWN
+  if((val1 >= 195)&&(val1<=380)){     
+  int k = 0;
+  int i = 0;
+    for (k; k<=100; k++){
+      if(k>=70){
+        i = 1;
+      }else{
+        i = 0;              
+      }
+    }
+    if (i == 1){
+      switch (counterMenuCheck){
+case (0):
+counterMainMenu--;
+break;
+case (1):
+counterSubMenu--;
+break;
+case (2);
+break;
+default:
+break;
+}
+    }
+  }
+//.................................button LEFT
+  if((val1 >= 450)&&(val1<=555)){      
+  int k = 0;
+  int i = 0;
+    for (k; k<=100; k++){
+      if(k>=70){
+        i = 1;
+      }else{
+        i = 0;              
+      }
+    }
+    if (i == 1){
+     // counterSubMenu++;
+    }
+  }
+//...................................button SELECT
+  if((val1 >= 555)&&(val1<=790)){    
+  int k = 0;
+  int i = 0;
+    for (k; k<=100; k++){
+      if(k>=70){
+        i = 1;
+      }else{
+        i = 0;              
+      }
+    }
+    if (i == 1){
+    //  counterSubMenu++;
+    }
+  }
+//................................... button RIGHT
+ if(val1 <=50){                      
+  int k = 0;
+  int i = 0;
+    for (k; k<=100; k++){
+      if(k>=70){
+        i = 1;
+      }else{
+        i = 0;              
+      }
+    }
+    if (i == 1){
+      // counterSubMenu++;
+    }
+  }
+}
+
+
+void loop() {
+  // put your main code here, to run repeatedly:
+
+
+}
