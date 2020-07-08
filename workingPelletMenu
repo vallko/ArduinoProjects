@@ -1,0 +1,300 @@
+#include <LiquidCrystal.h>
+#include "DFRkeypad.h"
+#include "Arduino.h"
+#include "Array.h"
+
+ // int val=analogRead(KEYPAD);                             // ... get the analog value for it
+  int s1=0;
+  int val1=analogRead(KEYPAD);                             // read analog button
+  int counterSubMenu = 0;                       //broqch  podMenu     default:0
+  int counterMainMenu = 0;                              //broqch GlavnoMenu     default:0
+  int counterMenuCheck = 0;
+  int back = 0;
+  int fireIsPresent = 0;                        //stoinost 0 - nqma ogun ; stoinost 1 - ima ogun;
+  int mainSupplyPelletRelay1 = 0;                 // Rele podavasht shenk kum gorelka; 0 - izkl; 1 - vkl;
+  int burnerSupplyPelletRelay2 = 0;                 // Zarejdasht shnek na peleti v gorelkata; 0 - izkl; 1 - vkl;
+  int watePumpRelay3 = 0;                               // Rele za vkluchvane na vodnata pompa;
+  int ceramicHeater = 0;                       // Nagrevatel za zapalvane; 0 - izkl; 1 - vkl;
+  int waterTemperature = 0;                          // stoinost temperatura Voda;            default: 25
+  int turbineSpeed = 0;                       // stoinost skorostTurbina;
+  int keepUpMode = 0;                                 // Rejim na poddurjane na zadadenite stoinosti;  default 0;
+  int backFireHighTemp = 0;                          // Rejim zashtita obraten ogun; 0 - nqma; 1 - visokaTemperatura spira podavane kum gorelka;
+  int pelletSensorFull = 0;                         //Sensor za prepulvane; 0 - vkluchva glaven shnek i pulni gorelka; 1 - izkluchva podavane ot glaven shnek;
+  int bunkerPelletQuantity = 0;                     //senzor za izchislqvane na kolichestvo na peleti; stoinost v % ot 0 - 100;
+  
+const char subMenu1[4][16] = { "", "", "", "",}; 
+const char subMenu[4][16] = { "t voda", "skorost Turbina", "Poddurjane", "Sedmichen grafik",}; 
+const char mainMenu[4][16] = {" Klas A1 Peleti", " Klas A Peleti", " Klas B Peleti", "   Drug Vid",};
+
+enum ePins { LCD_RS=8, LCD_EN=9, LCD_D4=4, LCD_D5=5, LCD_D6=6, LCD_D7=7, LCD_BL=10 }; // дефиниране на LCD пинове
+LiquidCrystal lcd(LCD_RS, LCD_EN, LCD_D4, LCD_D5, LCD_D6, LCD_D7); // Инициализиране на библиотека с дефинираните пинове
+
+byte digits(unsigned int iNum) // calculate the number of digits
+{
+  byte bDigits=0;
+  do
+  {
+    ++bDigits;
+    iNum/=10;
+  } while(iNum);
+  return bDigits;
+}
+
+
+
+void printNumber(unsigned int number, byte numd) // print fixed-width uint number
+{
+  byte d=digits(number);
+  for(byte i=d; i<numd; ++i) lcd.print((char)' '); // padding
+  lcd.print(number);
+}
+
+byte lastKey=DFRkeypad::eINVALID_KEY;
+float sum[DFRkeypad::eNUM_KEYS], sumq[DFRkeypad::eNUM_KEYS];  // arrays to sum up values for mean and deviation
+unsigned int values[DFRkeypad::eNUM_KEYS];                    // counter for number of samples
+unsigned long LastTime;
+enum eSymbols { symPLUSMINUS=0 };                             // deviation LCD Symbol "+/-"
+byte char_plusminus[8]=
+  {
+  B00100,
+  B00100,
+  B11111,
+  B00100,
+  B00100,
+  B00000,
+  B11111,
+  B00000,
+  };
+
+void clearStat() // изчистване на статистиките
+{
+  memset(sum, 0, sizeof(sum));
+  memset(sumq, 0, sizeof(sumq));
+  memset(values, 0, sizeof(values));
+}
+
+void setup()
+{
+  
+  lcd.begin(16, 2);                               // set up the LCD's number of columns and rows (16x2)
+  lcd.createChar(symPLUSMINUS, char_plusminus);   // create +/- character
+
+  pinMode(LCD_BL, OUTPUT);                        // pin LCD_BL is LCD backlight brightness (PWM)
+  analogWrite(LCD_BL, 10);                       // set the PWM brightness to maximum
+  lcd.setCursor(0, 0);
+  lcd.print(" Gorelka Feniks ");
+   lcd.setCursor(0,1);
+   delay(2000);
+  lcd.print(" Select Up Down ");
+  DFRkeypad::FastADC(true);                       // increase ADC sample frequency
+  DFRkeypad::iDEFAULT_THRESHOLD=140;              // maximum threshold acceptable so bounds in DFRkeypad::iARV_VALUES are not overlapping
+  clearStat();                                    // clear statistics
+  LastTime=millis();                              // remember tick counter
+
+}
+void lcdClearFirstRow(){
+lcd.setCursor(0,0);
+lcd.print("                ");
+lcd.setCursor(0,0);
+}
+void buttonCheck(){
+  int val1=analogRead(KEYPAD);                             // ... get the analog value for it
+
+  //....................................button  UP
+  if ((val1 >= 50)&&(val1<=195)){      
+  int u = 0;
+  int u1 = 0;
+    for (u; u<=200; u++){
+      if(u>=150){
+        u1 = 1;
+        delay(10);
+      }else{
+        u1 = 0;              
+      }
+    }
+    if (u1 == 1){
+switch (counterMenuCheck){
+case (0):
+counterMainMenu++;
+delay(20);
+break;
+case (1):
+counterSubMenu++;
+delay(20);
+break;
+case (2):
+break;
+}
+    }
+  }
+//.................................... button DOWN
+  if((val1 >= 195)&&(val1<=380)){     
+  int d = 0;
+  int d1 = 0;
+    for (d; d<=200; d++){
+      if(d>=150){
+        d1 = 1;
+        delay(10);
+      }else{
+        d1 = 0;              
+      }
+    }
+    if (d1 == 1){
+switch (counterMenuCheck){
+case (0):
+counterMainMenu--;
+delay(20);
+break;
+case (1):
+counterSubMenu--;
+delay(20);
+break;
+case (2):
+break;
+}
+    }
+  }
+ 
+//.................................button LEFT
+  if((val1 >= 450)&&(val1<=555)){      
+  int l = 0;
+  int l1 = 0;
+    for (l; l<=150; l++){
+      if(l>=120){
+        l1 = 1;
+      }else{
+        l1 = 0;              
+      }
+    }
+    if (l1 == 1){
+  //   counterSubMenu++;
+      delay(20);
+
+    }
+  }
+
+//...................................button SELECT
+  if((val1 >= 555)&&(val1<=790)){    
+  int s = 0;
+  int s1 = 0;
+    for (s; s<=200; s++){
+      if(s>=150){
+        s1 = 1;
+        delay(10);
+      }else{
+        s1= 0;              
+      }
+    }
+    if (s1 == 1){
+   counterMenuCheck = 1;
+   counterSubMenu = 1;
+ 
+     delay(20);
+    }
+  
+  }
+//................................... button RIGHT
+ if(val1 <=50){                      
+  int r = 0;
+  int r1 = 0;
+    for (r; r<=100; r++){
+      if(r>=70){
+        r1 = 1;
+      }else{
+        r1 = 0;              
+      }
+    }
+    if (r1 == 1){
+      //counterSubMenu++;
+        delay(20);
+    }
+  }
+}
+
+void mainMenu1(){                                                           // Glavno menu
+switch (counterMainMenu){
+case (0):
+lcdClearFirstRow();
+lcd.print(mainMenu[0]);
+delay(50);
+buttonCheck();
+break;
+
+case(1):
+lcdClearFirstRow();
+lcd.print(mainMenu[1]);
+buttonCheck();
+delay(50);
+break;
+
+case(2):
+lcdClearFirstRow();
+lcd.print(mainMenu[2]);
+buttonCheck();
+delay(50);
+break;
+
+case (3):
+lcdClearFirstRow();
+lcd.print(mainMenu[3]);
+buttonCheck();
+delay(50);
+break;
+
+default:
+counterMainMenu=0;
+delay(20);
+}
+}
+void SubMenu(){                                                             // podmenuta
+switch(counterSubMenu){
+case(1):
+lcdClearFirstRow();
+lcd.print(subMenu[0]);
+delay(50);
+buttonCheck();
+break;
+
+case(2):
+lcdClearFirstRow();
+lcd.print(subMenu[1]);
+delay(50);
+buttonCheck();
+break;
+
+case(3):
+lcdClearFirstRow();
+lcd.print(subMenu[2]);
+delay(50);
+buttonCheck();
+break;
+
+case(4):
+lcdClearFirstRow();
+lcd.print(subMenu[3]);
+delay(50);
+buttonCheck();
+break;
+default: counterMenuCheck = 0;
+}
+} 
+
+
+
+
+void loop(){
+int val1=analogRead(KEYPAD);  ;                                  //stoinost buton    
+buttonCheck();
+mainMenu1();    
+ while(counterMenuCheck == 1){
+      SubMenu();
+      delay(100);
+    }
+}
+
+
+
+
+
+
+
