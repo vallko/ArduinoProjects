@@ -1,0 +1,54 @@
+    
+    * Ultrasonic Sensor HC-SR04 
+  
+    // defines pins numbers
+    const int trigPin = 9;
+    const int echoPin = 10;
+    // defines variables
+    long duration;										//
+    int distance;										// изчисляване на използваните пелети 
+    int hBunker = 0;									//visochina na bunkera
+	int pelletPercentLeft = 0;							//procent ostanalite peleti; Cqlo kolichestvo 100 - izpolzwanite do momenta
+	int usedPellets = 0;								//изчисляване на използваните пелети Разстояние / Височина * 100;
+	
+    void setup() {
+    pinMode(trigPin, OUTPUT); // Sets the trigPin as an Output
+    pinMode(echoPin, INPUT); // Sets the echoPin as an Input
+    Serial.begin(9600); // Starts the serial communication
+    }
+    void loop() {
+    // Clears the trigPin
+    digitalWrite(trigPin, LOW);
+    delayMicroseconds(2);
+    // Sets the trigPin on HIGH state for 10 micro seconds
+    digitalWrite(trigPin, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(trigPin, LOW);
+    // Reads the echoPin, returns the sound wave travel time in microseconds
+    duration = pulseIn(echoPin, HIGH);
+    // Calculating the distance
+    distance= duration*0.034/2;
+    }
+	while((menuCheck == 4)(mainMenu == 3){				//Подменю за настройка на височина на бункера 
+	lcd.clearFirstRow();
+    lcd.setCursor(0,0);
+    lcd.print("Visochina bunker")
+	lcd.setCursor(1,0);
+	lcd.print(hBunker);
+    lcd.setCursor(1,5);
+    lcd.print("sm");
+	buttonCheck();										// да се добави инкрементиране на променлива hBunker за височина на бункера;
+	}
+void pelletBunkerLeftPercent(){							// функция за изчисляване на процент оставащи пелети в бункера
+usedPellets = (Distance / hBunker)*100;
+	pelletPercentLeft = 100 - usedPellets;
+	lcdClearFirstRow();
+	Serial.print(pelletPercentLeft);
+	lcd.printf("%%");
+	delay(500);
+}
+
+while((menuCheck == 3)(mainMenu == 1){					// извикване на подменю за показване на оставащи пелети
+	pelletBunkerLeftPercent();
+	}
+	}
