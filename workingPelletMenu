@@ -22,8 +22,8 @@
   int pelletSensorFull = 0;                         //Sensor za prepulvane; 0 - vkluchva glaven shnek i pulni gorelka; 1 - izkluchva podavane ot glaven shnek;
   int bunkerPelletQuantity = 0;                     //senzor za izchislqvane na kolichestvo na peleti; stoinost v % ot 0 - 100;
   
-const char subMenu1[4][16] = { "", "", "", "",}; 
-const char subMenu[4][16] = { "t voda", "skorost Turbina", "Poddurjane", "Sedmichen grafik",}; 
+const char subMenu1[3][16] = { "Start", "Stop", "Grafik",}; 
+const char subMenu[4][16] = { "t voda", "skorost Turbina", "Podavasht Shnek", "Vreme do zapalvane",}; 
 const char mainMenu[4][16] = {" Klas A1 Peleti", " Klas A Peleti", " Klas B Peleti", "   Drug Vid",};
 
 enum ePins { LCD_RS=8, LCD_EN=9, LCD_D4=4, LCD_D5=5, LCD_D6=6, LCD_D7=7, LCD_BL=10 }; // дефиниране на LCD пинове
