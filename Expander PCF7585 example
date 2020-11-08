@@ -1,0 +1,24 @@
+
+#include "PCF8575.h"
+PCF8575 expander(0x20);
+
+void setup()
+{
+  Serial.begin(115200);
+  expander.begin();
+}
+
+void loop()
+{
+  expander.write(0, LOW);
+  delay(500);
+  expander.write(1, LOW);
+    delay(500);
+  expander.write(2, LOW);
+  delay(500);
+  expander.write(3, LOW);
+  delay(500);
+ 
+  delay(500);
+}
+
