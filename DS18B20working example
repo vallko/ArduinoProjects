@@ -1,0 +1,32 @@
+#include <OneWire.h>
+#include <DS18B20.h>
+#define ONE_WIRE_BUS 3
+OneWire oneWire(ONE_WIRE_BUS);
+DS18B20 sensor(&oneWire);
+uint32_t start, stop;
+float t;
+int n = 0;
+
+
+void setup() {
+Serial.begin(115200);
+sensor.begin();
+sensor.setResolution(12);
+sensor.requestTemperatures();
+start = millis();  
+while (!sensor.isConversionComplete()) n++;
+stop = millis();
+}
+void loop() {
+  for (int r = 9; r < 14; r++)
+  {
+    sensor.setResolution(r);
+    start = millis();
+    sensor.requestTemperatures();
+    while (!sensor.isConversionComplete()) n++;
+    t = sensor.getTempC();
+    stop = millis();
+    Serial.println( t, 1); // 1 цифра след десетичната запетая
+delay(1000);
+  }
+}
