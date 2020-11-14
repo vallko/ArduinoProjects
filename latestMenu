@@ -1,0 +1,704 @@
+#include <LiquidCrystal.h>
+#include "DFRkeypad.h"
+#include "Arduino.h"
+#include "Array.h"
+#include <avr/sleep.h>
+#include <OneWire.h>
+#include <DS18B20.h>
+
+#define trigPin 10                                          //дефинирай тригерен пин Ultrasonic
+#define echoPin 2                                           //дефинирай ехо пин Ultrasonic
+//define interruptPin 2                                      // дефинирай пин за събуждане на процесора
+#define ONE_WIRE_BUS 3
+OneWire oneWire(ONE_WIRE_BUS);
+DS18B20 sensor(&oneWire);
+uint32_t start, stop;
+float t;                                                      //променлива за температура
+int n = 0;                                                    //променлива отброяване на измерване на температура
+float duration, distance, procenti;
+int bunkerHight = 150;                                      // Променлива за височина на бункера за изчисляване на оставащите пелети
+int totalPercent = 0;                                     
+unsigned long time;
+int s1=0;                                                 // Променлива бутон селект
+int l1 = 0;
+int r1=0;                                                 // Променлива за десен бутон
+int val1=analogRead(KEYPAD);                             // Променлива за присвояване на аналогова стойност на бутон
+int counterManualSettings = 0;                            //Брояч меню нстройки     default:0
+int counterpelletMenu = 0;                              //брояч меню пелети     default:0   
+int counterMenuCheck = 0;                               // брояч ниво менюта            MAIN - 1 > SUB - 2> SUB1>3
+int counterSensorData = 0;                                //Брояч меню сензори стойности
+int counterSubMenu1 = 0;                               //брояч мен часовник и график
+int counterSubMenu = 0;
+int back = 0;
+int fireIsPresent = 0;                                //Променлива за успешно запалване
+int mainSupplyPelletRelay1 = 0;                       // Реле за главният подаващ шнек
+int burnerSupplyPelletRelay2 = 0;                     // Реле зареждащ шнек горелка
+int waterPumpRelay3 = 0;                               // Реле включване водна помпа
+int ceramicHeater = 0;                               // Реле за нагревател за запалване
+int waterTemperature = 25;                          // Променлива Стойност температура вода           default: 25
+int turbineSpeed = 0;                               // Променлива Стойност скорост турбина
+int keepUpMode = 0;                                 // Режим поддръжка  default 0;
+int backFireHighTemp = 0;                          // Режим защита обратен огън 0 - nqma; 1 - visokaTemperatura spira podavane kum gorelka;
+int pelletSensorFull = 0;                           // Сензор за препълване 0 - vkluchva glaven shnek i pulni gorelka; 1 - izkluchva podavane ot glaven shnek;
+int bunkerPelletQuantity = 0;                      //Променлива за количество пелети в бункера стойност v % ot 0 - 100;
+const int buzzerPin = 12;                          //FireSensor
+const int flamePin = 3;
+int Flame = HIGH;
+int LED = 13; // Сензор за препълване
+int obstaclePin = 3;  // Пин за четен
+int hasObstacle = HIGH;  // Високо ниво няма препядствие
+
+const char pelletMenu[4][16] = {" Klas A1 Peleti", " Klas A Peleti", " Klas B Peleti", "  Drug Vid"};
+const char subMenu[6][16] = { "Start", "Stop", "Set Power kW", "Schedule","Manual settings", "Back"};
+const char manualSettings[7][16] = { "Set T water","Bunker dimension", "Set Turbine", "Set Shnek", "Set Igniter Time", "Set Pump speed","Back",};         //Подменю ръчни настройки (manual settings)
+const char subMenu1[6][16] = { "Set time", "Set Date", "View all tasks", "Create new task","Delete tasks" "Back"};                        // Меню с часовник и график (schedule)
+const char sensorData[8][16] = {"Current Process", "Water Temp", "Turbine speed","Pump speed", "Bunker Level", "Electronics Temp", "Next Task","Time/Date",};   //Живи данни  (Start/ Stop)
+
+enum ePins { LCD_RS=8, LCD_EN=9, LCD_D4=4, LCD_D5=5, LCD_D6=6, LCD_D7=7, LCD_BL=10 }; // дефиниране на LCD пинове
+LiquidCrystal lcd(LCD_RS, LCD_EN, LCD_D4, LCD_D5, LCD_D6, LCD_D7);                    // Инициализиране на библиотека с дефинираните пинове
+
+byte digits(unsigned int iNum) // calculate the number of digits
+{
+  byte bDigits=0;
+  do
+  {
+    ++bDigits;
+    iNum/=10;
+  } while(iNum);
+  return bDigits;
+}
+void printNumber(unsigned int number, byte numd) // print fixed-width uint number
+{
+  byte d=digits(number);
+  for(byte i=d; i<numd; ++i) lcd.print((char)' '); // padding
+  lcd.print(number);
+}
+byte lastKey=DFRkeypad::eINVALID_KEY;
+float sum[DFRkeypad::eNUM_KEYS], sumq[DFRkeypad::eNUM_KEYS];  // arrays to sum up values for mean and deviation
+unsigned int values[DFRkeypad::eNUM_KEYS];                    // counter for number of samples
+unsigned long LastTime;
+enum eSymbols { symPLUSMINUS=0 };                             // deviation LCD Symbol "+/-"
+byte char_plusminus[8]=
+  {
+  B00100,
+  B00100,
+  B11111,
+  B00100,
+  B00100,
+  B00000,
+  B11111,
+  B00000,
+  };
+
+void clearStat() // изчистване на статистиките
+{
+  memset(sum, 0, sizeof(sum));
+  memset(sumq, 0, sizeof(sumq));
+  memset(values, 0, sizeof(values));
+}
+
+void setup()
+{ 
+    Serial.begin(9600);  
+  Serial.begin(115200);
+  
+  pinMode(LED, OUTPUT);                           //сензор за препълване
+  pinMode(obstaclePin, INPUT);                    // сензор за препълване
+  pinMode(buzzerPin, OUTPUT);                     //сензор за огън
+  pinMode(flamePin, INPUT);                       //сензор за огън
+  lcd.begin(16, 2);                               // set up the LCD's number of columns and rows (16x2)
+  lcd.createChar(symPLUSMINUS, char_plusminus);   // create +/- character
+  pinMode(LCD_BL, OUTPUT);                        // pin LCD_BL is LCD backlight brightness (PWM)
+  analogWrite(LCD_BL, 10);                       // set the PWM brightness to maximum
+  lcd.setCursor(0, 0);
+  lcd.print("Phoenix Systems");
+  delay(2000);
+    lcd.setCursor(0, 0);
+  lcd.print("Peletna Gorelka");
+  lcd.setCursor(0,1);
+  delay(3000);
+  lcd.print(" Select Up Down ");
+  DFRkeypad::FastADC(true);                       // increase ADC sample frequency
+  DFRkeypad::iDEFAULT_THRESHOLD=140;              // maximum threshold acceptable so bounds in DFRkeypad::iARV_VALUES are not overlapping
+  clearStat();                                    // clear statistics
+  LastTime=millis();                              // remember tick counter
+    Serial.begin (9600);
+  //pinMode(trigPin, OUTPUT);                     // тригерен пин за Оставащи пелети
+  //pinMode(echoPin, INPUT);                      // ехо Пин оставащи пелети
+sensor.begin();                                   //DS18B20
+sensor.setResolution(12);
+sensor.requestTemperatures();
+start = millis();  
+while (!sensor.isConversionComplete()) n++;
+stop = millis();
+}
+
+void lcdClearFirstRow(){                           // функция за изчистване на първият ред на дисплея
+lcd.setCursor(0,0);
+lcd.print("                ");
+lcd.setCursor(0,0);
+}
+void lcdClearSecondRow(){                           // функция за изчистване на втори ред на дисплея
+lcd.setCursor(1,0);
+lcd.print("                ");
+lcd.setCursor(1,0);
+}
+void nullMenuCounter(){
+counterpelletMenu = 0;
+counterSubMenu = 0;
+counterManualSettings = 0;
+counterSubMenu1 = 0;
+}
+void pelletSensorFullFunction() {
+  hasObstacle = digitalRead(obstaclePin); //Reads the output of the obstacle sensor from the 7th PIN of the Digital section of the arduino
+  if (hasObstacle == LOW) //LOW means something is ahead, so illuminates the 13th Port connected LED
+  {
+    Serial.println("Stop something is ahead!!");
+    digitalWrite(LED, HIGH);//Illuminates the 13th Port LED
+  }
+  else
+  {
+    Serial.println("Path is clear");
+    digitalWrite(LED, LOW);
+  }
+}
+void fireIsPresentFunction(){
+  Flame = digitalRead(flamePin);
+  if (Flame== LOW)
+  {
+    fireIsPresent = 1;
+    Serial.println("Успешно запалване");
+    digitalWrite(buzzerPin, HIGH);
+  }
+  else
+  {
+    fireIsPresent = 0;
+    Serial.println("Няма огън");
+    digitalWrite(buzzerPin, LOW);
+  }
+  delay(500);
+}
+void bunkerPercent(){                                                 //функция за процент на оставаши пелети
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(5);
+  digitalWrite(trigPin, LOW);
+  duration = pulseIn(echoPin, HIGH);
+  distance = (duration / 2) * 0.034;
+  procenti = 100-(distance/(bunkerHight / 100));                                // BunkerHight променлива за дълбочина.
+  if (distance >= 250) {
+     Serial.println("Out of range");
+  } else if (distance <= 2){
+         Serial.println("Clean sensor");
+  }
+  else {
+    for (int i = 1; i<= 400; i++){                                              //осредняване на стойностите
+      totalPercent+= procenti;
+    }
+    totalPercent = totalPercent / 400;
+    if(totalPercent <=10){
+    Serial.print("Ниско ниво на пелети - ");
+    Serial.print(round(totalPercent));
+    Serial.println("% Презареди!");
+    }else{
+    Serial.print("Оставащи пелети ");
+    Serial.print(round(totalPercent));
+    Serial.println("%");
+    }
+  }
+return totalPercent;
+}
+
+void startFunction(){               //функция за старт. Пъленене; Водна помпа; запалка; турбина. Проверка за огън.
+while(fireIsPresent != 1){
+while(pelletSensorFull != 1){            //зареждане на пелети и проверка за първоначално напълване.
+mainSupplyPelletRelay1 = 1;
+burnerSupplyPelletRelay2 = 1;
+delay(100);
+if((fireIsPresent == 0)&&(pelletSensorFull == 1)){    // ако няма огън и е пълно с пелети; вкл. керамичната запалка
+ceramicHeater = 1;
+waterPumpRelay3 = 1;
+delay(8000);
+turbineSpeed = 1;
+//Условие за сензор за напълено състояние
+//и промяна на променлва pelletSensorFull = 1
+      }
+    }
+  }
+}
+
+void temperatureDS18B20(){
+  for (int r = 9; r < 14; r++)
+  {
+    sensor.setResolution(r);
+    start = millis();
+    sensor.requestTemperatures();
+    while (!sensor.isConversionComplete()) n++;
+    t = sensor.getTempC();
+    stop = millis();
+    Serial.println( t, 1); // 1 цифра след десетичната запетая
+return t;
+  }
+}
+
+void goingToSleep(){
+sleep_enable();
+attachInterrupt(0,wakeUp,LOW); 
+set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+digitalWrite(LED_BUILTIN,LOW);
+delay(1000);
+sleep_cpu();
+}
+void wakeUp(){
+  sleep_disable();
+  detachInterrupt(0);
+}
+
+
+void stopFucntion(){                //Функция за спиране на горелката. Проверка при наличен огън; изразходавай заредените пелети. При температура по-голяма или равна на 50% върти помпата и турбината.
+ceramicHeater = 0;
+while(fireIsPresent == 1){
+burnerSupplyPelletRelay2 = 1;
+while(waterTemperature >=50){
+waterPumpRelay3 = 1;
+turbineSpeed = 1;
+    }
+  }
+if((fireIsPresent == 0)&&(waterTemperature < 50)){
+mainSupplyPelletRelay1 = 0;                       
+burnerSupplyPelletRelay2 = 0;                    
+waterPumpRelay3 = 0;                              
+ceramicHeater = 0;                               
+turbineSpeed = 0;
+goingToSleep();
+  }
+}
+void buttonCheck(){
+  int val1=analogRead(KEYPAD);                             // ... get the analog value for it
+
+  //....................................button  UP
+  if ((val1 >= 50)&&(val1<=195)){      
+  int u = 0;
+  int u1 = 0;
+    for (u; u<=200; u++){
+      if(u>=150){
+        u1 = 1;
+        delay(5);
+      }else{
+        u1 = 0;              
+      }
+    }
+    if (u1 == 1){
+switch (counterMenuCheck){
+case (0):
+counterSensorData++;
+delay(5);
+break;
+case (1):
+counterpelletMenu++;
+counterSubMenu++;
+counterManualSettings++;
+counterSubMenu1++;
+delay(5);
+break;
+case (2):
+counterManualSettings++;
+delay(5);
+break;
+      }
+    }
+  }
+//.................................... button DOWN
+  if((val1 >= 195)&&(val1<=380)){     
+  int d = 0;
+  int d1 = 0;
+    for (d; d<=200; d++){
+      if(d>=150){
+        d1 = 1;
+        delay(5);
+      }else{
+        d1 = 0;              
+      }
+    }
+    if (d1 == 1){
+switch (counterMenuCheck){
+case (0):
+counterSensorData--;
+delay(5);
+break;
+case (1):
+counterpelletMenu--;
+counterSubMenu--;
+counterManualSettings--;
+counterSubMenu1--;
+delay(20);
+break;
+case (2):
+counterManualSettings--;
+delay(5);
+break;
+        }
+    }
+  }
+ 
+//.................................button LEFT
+  if((val1 >= 380)&&(val1<=555)){      
+  int l = 0;
+    for (l; l<=200; l++){
+      if(l>=150){
+        l1 = 1;
+        delay(5);
+      }else{
+        l1 = 0;         
+        delay(5);     
+      }
+    }
+    if (l1 == 1){
+      counterMenuCheck--;
+      delay(5);
+      l1=0;
+    }
+  }
+//...................................button SELECT
+  if((val1 >= 555)&&(val1<=790)){    
+  int s = 0;
+  int s1 = 0;
+    for (s; s<=200; s++){
+      if(s>=180){
+        s1 = 1;
+        delay(5);
+      }else{
+        s1= 0;        
+        delay(5);      
+      }
+    }
+    if (s1 == 1){
+}
+  
+  }
+//................................... button RIGHT
+ if(val1 <=50){                      
+  int r = 0;
+    for (r; r<=200; r++){
+      if(r>=150){
+        r1 = 1;
+        delay(5);
+      }else{
+        r1 = 0;     
+        delay(5);         
+      }
+    }
+    if (r1 == 1){
+          counterMenuCheck++;
+        delay(5);
+        r1=0;
+    }
+  }
+}
+void powerKwFunction(){
+lcdClearFirstRow();
+lcdClearSecondRow();
+buttonCheck();
+
+}
+
+void sensorDataFunction(){                                                             // Скриин савер Меню след старт Стоп
+switch (counterSensorData){
+case (0):
+lcdClearFirstRow();
+lcd.print(sensorData[0]);
+buttonCheck();
+delay(1000);
+counterSensorData++;
+break;
+case (1):
+lcdClearFirstRow();
+lcd.print(sensorData[1]);
+buttonCheck();
+delay(1000);
+counterSensorData++;
+break;
+case (2):
+lcdClearFirstRow();
+lcd.print(sensorData[2]);
+buttonCheck();
+delay(1000);
+counterSensorData++;
+break;
+case (3):
+lcdClearFirstRow();
+lcd.print(sensorData[3]);
+buttonCheck();
+delay(1000);
+counterSensorData++;
+break;
+case (4):
+lcdClearFirstRow();
+lcd.print(sensorData[4]);
+buttonCheck();
+delay(1000);
+counterSensorData++;
+break;
+delay(20);
+case (5):
+lcdClearFirstRow();
+lcd.print(sensorData[5]);
+buttonCheck();
+delay(1000);
+counterSensorData++;
+break;
+delay(20);
+case (6):
+lcdClearFirstRow();
+lcd.print(sensorData[6]);
+buttonCheck();
+delay(1000);
+counterSensorData++;
+break;
+delay(20);
+case (7):
+lcdClearFirstRow();
+lcd.print(sensorData[7]);
+buttonCheck();
+delay(1000);
+counterSensorData++;
+break;
+delay(20);
+case (8):
+lcdClearFirstRow();
+lcd.print(sensorData[8]);
+buttonCheck();
+delay(1000);
+counterSensorData++;
+break;
+default: counterSensorData = 0;
+delay(20);
+}
+}
+void pelletMenu1(){                                                            // Menu пелети
+switch (counterpelletMenu){
+case (0):
+lcdClearFirstRow();
+lcd.print(pelletMenu[0]);
+delay(20);
+buttonCheck();
+break;
+case(1):
+lcdClearFirstRow();
+lcd.print(pelletMenu[1]);
+buttonCheck();
+delay(20);
+break;
+case(2):
+lcdClearFirstRow();
+lcd.print(pelletMenu[2]);
+buttonCheck();
+delay(20);
+break;
+case (3):
+lcdClearFirstRow();
+lcd.print(pelletMenu[3]);
+buttonCheck();
+delay(20);
+break;
+default: counterpelletMenu = 0;
+delay(20);
+  }
+}
+
+void manualSettingsFunction(){                                                             // Подменю ниво 1
+switch(counterManualSettings){
+case(0):
+lcdClearFirstRow();
+lcd.print(manualSettings[0]);
+delay(20);
+buttonCheck();
+break;
+case(1):
+lcdClearFirstRow();
+lcd.print(manualSettings[1]);
+delay(20);
+buttonCheck();
+break;
+case(2):
+lcdClearFirstRow();
+lcd.print(manualSettings[2]);
+delay(20);
+buttonCheck();
+break;
+case(3):
+lcdClearFirstRow();
+lcd.print(manualSettings[3]);
+delay(20);
+buttonCheck();
+break;
+case(4):
+lcdClearFirstRow();
+lcd.print(manualSettings[4]);
+delay(20);
+buttonCheck();
+break;
+case(5):
+lcdClearFirstRow();
+lcd.print(manualSettings[5]);
+delay(20);
+buttonCheck();
+break;
+case(6):
+lcdClearFirstRow();
+lcd.print(manualSettings[7]);
+delay(20);
+buttonCheck();
+break;
+case(7):
+lcdClearFirstRow();
+lcd.print(manualSettings[7]);
+delay(20);
+buttonCheck();
+break;
+default: counterManualSettings = 0;
+}
+}
+void counterSubMenu1Function(){                             //subMenu1 час и график
+switch(counterSubMenu1){
+case(0):
+lcdClearFirstRow();
+lcd.print(subMenu1[0]);
+delay(50);
+buttonCheck();
+break;
+case(1):
+lcdClearFirstRow();
+lcd.print(subMenu1[1]);
+delay(50);
+buttonCheck();
+break;
+case(2):
+lcdClearFirstRow();
+lcd.print(subMenu1[2]);
+delay(50);
+buttonCheck();
+break;
+case(3):
+lcdClearFirstRow();
+lcd.print(subMenu1[3]);
+delay(50);
+buttonCheck();
+break;
+case(4):
+lcdClearFirstRow();
+lcd.print(subMenu1[4]);
+delay(50);
+buttonCheck();
+break;
+case(5):
+lcdClearFirstRow();
+lcd.print(subMenu1[5]);
+delay(50);
+buttonCheck();
+break;
+case(6):
+lcdClearFirstRow();
+lcd.print(subMenu1[6]);
+delay(50);
+buttonCheck();
+break;
+default: counterSubMenu = 0;
+}
+}
+void subMenuu(){                             //Подменю СТАРТ СТОП скриинсейвър
+switch(counterSubMenu){
+case(0):
+lcdClearFirstRow();
+lcd.print(subMenu[0]);
+delay(50);
+buttonCheck();
+break;
+case(1):
+lcdClearFirstRow();
+lcd.print(subMenu[1]);
+delay(50);
+buttonCheck();
+break;
+case(2):
+lcdClearFirstRow();
+lcd.print(subMenu[2]);
+delay(50);
+buttonCheck();
+break;
+case(3):
+lcdClearFirstRow();
+lcd.print(subMenu[3]);
+delay(50);
+buttonCheck();
+break;
+case(4):
+lcdClearFirstRow();
+lcd.print(subMenu[4]);
+delay(50);
+buttonCheck();
+break;
+case(5):
+lcdClearFirstRow();
+lcd.print(subMenu[5]);
+delay(50);
+buttonCheck();
+break;
+case(6):
+lcdClearFirstRow();
+lcd.print(subMenu[6]);
+delay(50);
+buttonCheck();
+break;
+default: 
+counterSubMenu = 0;
+}
+}
+void loop(){
+int val1=analogRead(KEYPAD);  ;                                  //стойност на бутон
+while(counterMenuCheck == 0){
+  sensorDataFunction();    
+  buttonCheck();
+  delay(20);
+}
+ while((counterMenuCheck == 1)&&(counterSensorData==0)){ 
+   sensorDataFunction();
+   buttonCheck();
+    delay(20);
+while((counterMenuCheck == 2)&&(counterSensorData==0)){
+  //sensorData();
+   buttonCheck();
+        delay(20);
+     }
+ }
+      while((counterMenuCheck == 1)&&(counterSensorData==1)){
+        pelletMenu1();
+        buttonCheck();
+        delay(20);
+        while((counterSensorData == 1)&&(counterMenuCheck==2)){
+          manualSettingsFunction();
+          buttonCheck();
+        delay(20);
+        
+      }
+      }
+      while((counterMenuCheck == 1)&&(counterSensorData==2)){
+        buttonCheck();
+         delay(20);
+      }
+      while((counterMenuCheck == 1)&&(counterSensorData==3)){
+        manualSettingsFunction();
+        buttonCheck();
+        delay(20);
+      }
+       while((counterMenuCheck == 1)&&(counterSensorData==4)){
+       // InformationMenu();
+        buttonCheck();
+        delay(20);
+      }
+      if((counterSensorData>4) ||(counterMenuCheck > 2) || (counterMenuCheck < 0)){
+        counterSensorData = 0;
+        counterMenuCheck = 0;
+      }
+ }
