@@ -1,0 +1,42 @@
+
+#define trigPin 10
+#define echoPin 13
+float duration, distance, procenti;
+int bunkerHight = 100;
+float totalPercent = 0;
+unsigned long time;
+
+void setup() {
+  Serial.begin (9600);
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+}
+void loop() {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(5);
+  digitalWrite(trigPin, LOW);
+  duration = pulseIn(echoPin, HIGH);
+  distance = (duration / 2) * 0.034;
+  procenti = 100-(distance/(bunkerHight / 100));                                // BunkerHight променлива за дълбочина.
+  if (distance >= 250 || distance <= 2) {
+     Serial.println("Out of range");
+  }
+  else {
+    for (int i = 1; i<= 400; i++){
+      totalPercent+= procenti;
+    }
+    totalPercent = totalPercent / 400;
+    if(totalPercent <=10){
+    Serial.print("Ниско ниво на пелети - ");
+    Serial.print(abs(totalPercent));
+    Serial.println("% Презареди!");
+    }else{
+    Serial.print("Оставащи пелети ");
+    Serial.print(round(totalPercent));
+    Serial.println("%");
+    }
+    delay(2000);
+  }
+  }
