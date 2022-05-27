@@ -1,4 +1,6 @@
-
+//Working menu for pellet burner project with RTOS testing on Uno board.
+//TODO Implement Hardware interupts and Remove RTOS (not enough memory)
+//Implement hardware interupts
 #include <Arduino_FreeRTOS.h>
 #include <LiquidCrystal.h>
 #include "DFRkeypad.h"
